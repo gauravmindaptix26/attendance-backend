@@ -2,8 +2,11 @@ import jwt from 'jsonwebtoken'
 import User from '../models/User.js';
 const verifyUser = async(req,res,next)=>{
   try{
-     const token=req.headers.authorization.split(' ')[1];
-     
+     const authHeader = req.headers.authorization;
+     if(!authHeader){
+      return res.status(404).json({success:false,error:"Token Not Provided"})
+     }
+     const token=authHeader.split(' ')[1];
      if(!token){
       return res.status(404).json({success:false,error:"Token Not Provided"})
      }
@@ -19,7 +22,8 @@ const verifyUser = async(req,res,next)=>{
   req.user=user
   next()
   }catch(error){
-  return res.status(500).json({success:false,error: "server error"})
+  console.error("Verify user error:", error);
+  return res.status(500).json({success:false,error: error.message || "server error"})
   }
 
 }
