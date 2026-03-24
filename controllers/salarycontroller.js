@@ -1,0 +1,53 @@
+import Salary from "../models/Salary.js"
+import Employee from "../models/Employee.js"
+const addSalary=async(req,res)=>{
+try{
+  const {employeeId,basicSalary,allowances,deductions,payDate}=req.body
+  const totalSalary=parseInt(basicSalary)+parseInt(allowances)+parseInt(deductions)
+  const newSalary=new Salary({
+  employeeId,
+  basicSalary,
+  allowances,
+  deductions,
+  netSalary:totalSalary,
+  payDate
+  })
+  await newSalary.save()
+  return res.status(200).json({success:true})
+}catch(error){
+  return res.status(500).json({success:false,error:"salary add server error"})
+}
+}
+const getSalary = async (req, res) => {
+  try {
+    const { id, role } = req.params;
+    console.log("Role:", role);
+
+    // Try to find by employeeId directly
+    let salary = await Salary.find({ employeeId: id }).populate("employeeId", "employeeId");
+
+    // If no salary found, try to find by userId
+    if (!salary || salary.length < 1) {
+      const employee = await Employee.findOne({ userId: id });
+
+      if (employee) {
+        salary = await Salary.find({ employeeId: employee._id }).populate("employeeId", "employeeId");
+      } else {
+        // If no employee found, return empty array safely
+        return res.status(200).json({
+          success: true,
+          salary: [],
+          message: "No employee found for this user ID.",
+        });
+      }
+    }
+
+    return res.status(200).json({ success: true, salary });
+  } catch (error) {
+    console.error("Salary Fetch Error:", error.message);
+    return res.status(500).json({ success: false, error: "Salary get server error" });
+  }
+};
+
+
+export {addSalary,getSalary}
