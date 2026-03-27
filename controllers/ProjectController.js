@@ -1,5 +1,7 @@
 import Employee from "../models/Employee.js";
 import Project from "../models/Project.js";
+import { v2 as cloudinary } from "cloudinary";
+import streamifier from "streamifier";
 
 const normalizeExternalCollaborators = (collaborators = []) =>
   collaborators
@@ -18,12 +20,51 @@ const normalizeSharedResources = (resources = []) =>
     .map((resource) => ({
       title: resource.title.trim(),
       url: resource.url.trim(),
+      sourceType: "link",
       resourceType: resource.resourceType || "other",
       notes: resource.notes?.trim() || "",
     }));
 
+const inferResourceTypeFromFile = (file) => {
+  const mimeType = file.mimetype || "";
+  if (mimeType.includes("pdf") || mimeType.includes("text") || mimeType.includes("word")) {
+    return "document";
+  }
+
+  return "other";
+};
+
+const uploadFileToCloudinary = (file) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "project_resources",
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (result) {
+          resolve(result);
+          return;
+        }
+
+        reject(error);
+      }
+    );
+
+    streamifier.createReadStream(file.buffer).pipe(stream);
+  });
+
+const parseProjectPayload = (body) => {
+  if (body?.projectData) {
+    return JSON.parse(body.projectData);
+  }
+
+  return body;
+};
+
 export const addProject = async (req, res) => {
   try {
+    const payload = parseProjectPayload(req.body);
     const {
       Title,
       Client,
@@ -35,7 +76,7 @@ export const addProject = async (req, res) => {
       description,
       externalCollaborators = [],
       sharedResources = [],
-    } = req.body;
+    } = payload;
 
     const cleanTitle = Title?.trim();
     const cleanClient = Client?.trim();
@@ -43,9 +84,10 @@ export const addProject = async (req, res) => {
     const cleanWoM = WoM?.trim();
 
     if (!cleanTitle || !cleanClient || !cleanAddress || !cleanWoM || !startDate) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Title, client, address, work order and start date are required." });
+      return res.status(400).json({
+        success: false,
+        error: "Title, client, address, work order and start date are required.",
+      });
     }
 
     const cleanEmployeeIds = [...new Set(employeeIds.filter(Boolean))];
@@ -68,6 +110,24 @@ export const addProject = async (req, res) => {
       });
     }
 
+    const uploadedResources = await Promise.all(
+      (req.files || []).map(async (file) => {
+        const uploadedFile = await uploadFileToCloudinary(file);
+
+        return {
+          title: file.originalname,
+          url: uploadedFile.secure_url,
+          sourceType: "upload",
+          resourceType: inferResourceTypeFromFile(file),
+          notes: "",
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          publicId: uploadedFile.public_id,
+        };
+      })
+    );
+
     const newProject = new Project({
       Title: cleanTitle,
       Client: cleanClient,
@@ -78,7 +138,7 @@ export const addProject = async (req, res) => {
       employeeIds: cleanEmployeeIds,
       description: description?.trim() || "",
       externalCollaborators: cleanCollaborators,
-      sharedResources: cleanSharedResources,
+      sharedResources: [...cleanSharedResources, ...uploadedResources],
       updatedAt: new Date(),
     });
 

@@ -16,11 +16,20 @@ const sharedResourceSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     url: { type: String, required: true, trim: true },
+    sourceType: {
+      type: String,
+      enum: ["link", "upload"],
+      default: "link",
+    },
     resourceType: {
       type: String,
       enum: ["google-drive", "onedrive", "dropbox", "document", "folder", "other"],
       default: "other",
     },
+    fileName: { type: String, trim: true },
+    mimeType: { type: String, trim: true },
+    size: { type: Number },
+    publicId: { type: String, trim: true },
     notes: { type: String, trim: true },
   },
   { _id: false }
