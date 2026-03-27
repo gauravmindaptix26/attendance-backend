@@ -28,6 +28,13 @@ const port = process.env.PORT || 5000
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,https://product-omega-three.vercel.app')
   .split(',')
   .map((origin) => origin.trim())
+  .map((origin) => {
+    try {
+      return new URL(origin).origin
+    } catch {
+      return origin
+    }
+  })
   .filter(Boolean)
 
 app.use(cors({

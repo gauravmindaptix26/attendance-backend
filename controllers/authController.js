@@ -4,19 +4,20 @@ import bcrypt from 'bcrypt'
 
 const login = async (req,res)=>{
   try{
-   const {email,password}=req.body;
+   const email = req.body.email?.trim().toLowerCase()
+   const password = req.body.password
    if(!email || !password){
     return res.status(400).json({success:false,error:"Email and password are required"})
    }
 
    const user=await User.findOne({email})
   if(!user){
-   return res.status(404).json({success:false,error:"User not found"}) 
+   return res.status(401).json({success:false,error:"Invalid email or password"}) 
   }
 
   const isMatch =await bcrypt.compare(password,user.password)
   if(!isMatch){
-    return res.status(404).json({success:false,error:"Wrong password"})
+    return res.status(401).json({success:false,error:"Invalid email or password"})
   }
 
   if(!process.env.JWT_KEY){
